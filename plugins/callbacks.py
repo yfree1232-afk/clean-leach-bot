@@ -74,9 +74,12 @@ async def handle_callbacks(client: Client, query: CallbackQuery):
         await query.message.edit_caption(
             caption=(
                 "**📚 Classplus Extraction Engine**\n\n"
-                "Please send your `orgCode` and your `Mobile Number` in the chat to generate an OTP.\n\n"
+                "Please send your `orgCode` and your `Mobile Number` in the chat to generate an OTP. \n"
+                "*(You can also directly send a JWT Token to bypass OTP)*\n\n"
                 "**Format:**\n"
-                "`[ORG_CODE]*[MOBILE_NUMBER]`\n\n"
+                "`[ORG_CODE]*[MOBILE_NUMBER]` \n"
+                "**OR**\n"
+                "`eyJhbGciOiJIUzI1NiIsInR5...`\n\n"
                 "> _Example:_\n"
                 "> `aiex*9999999999`"
             ),
