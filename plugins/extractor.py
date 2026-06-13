@@ -5,11 +5,24 @@ from pyrogram import Client, filters
 from pyrogram.types import Message
 from extractors.api_client import AppxClient
 from config import AUTH_USERS
+from bot_state import get_state, clear_state
+
+@Client.on_message(filters.text & filters.private & ~filters.command(["start", "help", "extract"]))
+async def handle_text(client: Client, message: Message):
+    user_id = message.from_user.id
+    state = get_state(user_id)
+    
+    if state == "WAITING_FOR_APPX_CREDS":
+        clear_state(user_id)
+        # Inject a fake command to reuse the extraction logic
+        message.text = f"/extract {message.text}"
+        await extract_cmd(client, message)
+        return
 
 @Client.on_message(filters.command("extract") & filters.private)
 async def extract_cmd(client: Client, message: Message):
-    if message.from_user.id not in AUTH_USERS:
-        return
+    # if message.from_user.id not in AUTH_USERS:
+    #     return
 
     try:
         parts = message.text.split(" ")
@@ -18,24 +31,37 @@ async def extract_cmd(client: Client, message: Message):
         base_url = parts[1]
         creds = parts[2]
         
+        is_token = False
         if "*" in creds:
             email, password = creds.split("*", 1)
         elif ":" in creds:
             email, password = creds.split(":", 1)
+        elif creds.startswith("ey"):
+            is_token = True
         else:
             raise ValueError()
     except Exception:
-        await message.reply_text("❌ Usage: `/extract [api_url] [email]*[password]`")
+        await message.reply_text("❌ Usage: `/extract [api_url] [email]*[password]` OR `/extract [api_url] [JWT_Token]`")
         return
 
     status_msg = await message.reply_text("⏳ **Connecting to API...**")
     
     appx = AppxClient(base_url)
-    login_resp = appx.login(email, password)
-    
-    if not login_resp.get("success"):
-        await status_msg.edit_text(f"❌ **Login Failed:** {login_resp.get('error')}")
-        return
+    if is_token:
+        appx.token = creds
+        try:
+            import base64
+            import json
+            payload = creds.split('.')[1]
+            payload += '=' * (-len(payload) % 4)
+            appx.user_id = json.loads(base64.b64decode(payload).decode('utf-8')).get('id')
+        except Exception as e:
+            print(f"Token parse error: {e}")
+    else:
+        login_resp = appx.login(email, password)
+        if not login_resp.get("success"):
+            await status_msg.edit_text(f"❌ **Login Failed:** {login_resp.get('error')}")
+            return
         
     app_name = base_url.split("//")[1].split(".")[0].upper().replace("API", "")
     token = appx.token
@@ -49,7 +75,7 @@ async def extract_cmd(client: Client, message: Message):
     courses_text = ""
     for c in courses:
         c_id = c.get("id", "N/A")
-        c_title = c.get("title", c.get("CourseName", "Unknown"))
+        c_title = c.get("title", c.get("CourseName", c.get("course_name", c.get("course_title", "Unknown"))))
         c_price = c.get("price", "0")
         courses_text += f"🆔 {c_id}  📚  {c_title}  💰 ₹{c_price}\n"
         
@@ -76,8 +102,8 @@ async def extract_cmd(client: Client, message: Message):
 
 @Client.on_message(filters.reply & filters.private)
 async def handle_course_selection(client: Client, message: Message):
-    if message.from_user.id not in AUTH_USERS:
-        return
+    # if message.from_user.id not in AUTH_USERS:
+    #     return
         
     if not hasattr(client, "user_sessions") or message.from_user.id not in client.user_sessions:
         return
