@@ -18,6 +18,57 @@ async def handle_text(client: Client, message: Message):
         message.text = f"/extract {message.text}"
         await extract_cmd(client, message)
         return
+        
+    if state == "WAITING_FOR_CLASSPLUS_PHONE":
+        parts = message.text.split("*")
+        if len(parts) != 2:
+            await message.reply_text("❌ Invalid format. Please send `[ORG_CODE]*[MOBILE_NUMBER]`")
+            return
+            
+        org_code, mobile = parts[0].strip(), parts[1].strip()
+        status_msg = await message.reply_text("⏳ **Requesting OTP...**")
+        
+        from extractors.classplus_api import ClassplusClient
+        cp = ClassplusClient(org_code)
+        resp = cp.generate_otp(mobile)
+        
+        if resp.get("status") == "success" or resp.get("data"):
+            session_id = resp.get("data", {}).get("sessionId", "")
+            set_state(user_id, f"WAITING_FOR_CLASSPLUS_OTP|{org_code}|{mobile}|{session_id}")
+            await status_msg.edit_text("✅ **OTP Sent successfully!**\n\nPlease reply with the OTP you received:\n> _Example:_ `1234`")
+        else:
+            await status_msg.edit_text(f"❌ **Failed to send OTP:** {resp.get('message', 'Unknown error')}")
+        return
+        
+    if str(state).startswith("WAITING_FOR_CLASSPLUS_OTP"):
+        parts = state.split("|")
+        if len(parts) < 3:
+            return
+        org_code = parts[1]
+        mobile = parts[2]
+        
+        otp = message.text.strip()
+        status_msg = await message.reply_text("⏳ **Verifying OTP...**")
+        
+        from extractors.classplus_api import ClassplusClient
+        cp = ClassplusClient(org_code)
+        resp = cp.verify_otp(mobile, otp)
+        
+        if not resp.get("success"):
+            await status_msg.edit_text(f"❌ **OTP Verification Failed:** {resp.get('error')}")
+            return
+            
+        clear_state(user_id)
+        token = cp.token
+        courses_resp = cp.fetch_courses()
+        
+        if not courses_resp.get("success"):
+            await status_msg.edit_text("❌ **Logged in, but failed to fetch courses.**")
+            return
+            
+        # Just dump the raw response for now to debug the structure
+        await status_msg.edit_text(f"✅ **Login Successful!**\n\nHere is the raw courses data length: {len(str(courses_resp.get('data')))}")
+        return
 
 @Client.on_message(filters.command("extract") & filters.private)
 async def extract_cmd(client: Client, message: Message):
