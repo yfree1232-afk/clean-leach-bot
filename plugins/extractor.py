@@ -20,9 +20,28 @@ async def handle_text(client: Client, message: Message):
         return
         
     if state == "WAITING_FOR_CLASSPLUS_PHONE":
-        parts = message.text.split("*")
+        text = message.text.strip()
+        
+        # Token Bypass Logic
+        if text.startswith("eyJ") and len(text) > 50:
+            status_msg = await message.reply_text("⏳ **Verifying Token Bypass...**")
+            from extractors.classplus_api import ClassplusClient
+            cp = ClassplusClient(org_code="UNKNOWN")
+            cp.token = text
+            cp.headers["x-access-token"] = text
+            
+            courses_resp = cp.fetch_courses()
+            if not courses_resp.get("success"):
+                await status_msg.edit_text(f"❌ **Token Verification Failed:** {courses_resp.get('error')}")
+                return
+                
+            clear_state(user_id)
+            await status_msg.edit_text(f"✅ **Token Login Successful!**\n\nRaw courses data length: {len(str(courses_resp.get('data')))}")
+            return
+            
+        parts = text.split("*")
         if len(parts) != 2:
-            await message.reply_text("❌ Invalid format. Please send `[ORG_CODE]*[MOBILE_NUMBER]`")
+            await message.reply_text("❌ Invalid format. Please send `[ORG_CODE]*[MOBILE_NUMBER]` or a valid `JWT Token`.")
             return
             
         org_code, mobile = parts[0].strip(), parts[1].strip()
