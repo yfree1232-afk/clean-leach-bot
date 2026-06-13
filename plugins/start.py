@@ -8,6 +8,17 @@ async def start_cmd(client: Client, message: Message):
     #     await message.reply_text("❌ You are not authorized to use this bot.")
     #     return
 
+    import asyncio
+    loading_msg = await message.reply_text("⚡ **Initializing Clean Leach Engine...**\n`[          ] 0%`")
+    await asyncio.sleep(0.4)
+    await loading_msg.edit_text("⚡ **Bypassing WAF Firewalls...**\n`[███       ] 30%`")
+    await asyncio.sleep(0.4)
+    await loading_msg.edit_text("⚡ **Establishing Secure Connection...**\n`[███████   ] 70%`")
+    await asyncio.sleep(0.4)
+    await loading_msg.edit_text("⚡ **System Online.**\n`[██████████] 100%`")
+    await asyncio.sleep(0.3)
+    await loading_msg.delete()
+
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🚀 Login & Extract", callback_data="menu_platforms")],
         [
