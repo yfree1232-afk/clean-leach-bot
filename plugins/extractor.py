@@ -1,7 +1,7 @@
 import os
 import time
 from datetime import datetime
-from pyrogram import Client, filters
+from pyrogram import Client, filters, ContinuePropagation
 from pyrogram.types import Message
 from extractors.api_client import AppxClient
 from config import AUTH_USERS
@@ -159,6 +159,8 @@ async def handle_text(client: Client, message: Message):
         await status_msg.edit_text(resp_text)
         return
 
+    raise ContinuePropagation
+
 @Client.on_message(filters.command("extract") & filters.private)
 async def extract_cmd(client: Client, message: Message):
     # if message.from_user.id not in AUTH_USERS:
@@ -240,7 +242,9 @@ async def extract_cmd(client: Client, message: Message):
     
     await status_msg.edit_text(success_msg)
 
-@Client.on_message(filters.reply & filters.private)
+from pyrogram.handlers import MessageHandler
+
+@Client.on_message(filters.text & filters.private & ~filters.command(["start", "extract"]))
 async def handle_course_selection(client: Client, message: Message):
     # if message.from_user.id not in AUTH_USERS:
     #     return
