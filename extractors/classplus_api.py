@@ -3,8 +3,10 @@ from curl_cffi import requests
 
 class ClassplusClient:
     def __init__(self, org_code):
-        self.org_code = org_code
         self.base_url = "https://api.classplusapp.com"
+        self.org_code = org_code
+        self.total_videos = 0
+        self.total_pdfs = 0
         self.session = requests.Session(impersonate="chrome110")
         self.token = None
         self.user_id = None
@@ -54,11 +56,49 @@ class ClassplusClient:
         if not self.token:
             return {"success": False, "error": "Not authenticated"}
             
-        url = f"{self.base_url}/v2/users/me"
+        url = f"{self.base_url}/v2/courses"
         try:
             res = self.session.get(url, headers=self.headers)
-            resp = res.json()
-            # Usually the user profile contains enrolled courses or we hit /v2/courses
-            return {"success": True, "data": resp}
+            try:
+                resp = res.json()
+                return {"success": True, "data": resp}
+            except:
+                return {"success": False, "error": f"API returned non-JSON: {res.text}"}
         except Exception as e:
             return {"success": False, "error": str(e)}
+
+    def extract_links(self, course_id):
+        links = []
+        
+        def traverse(folder_id, path):
+            url = f"{self.base_url}/v2/course/content/get?courseId={course_id}"
+            if folder_id:
+                url += f"&folderId={folder_id}"
+                
+            try:
+                res = self.session.get(url, headers=self.headers).json()
+                items = res.get("data", {}).get("courseContent", [])
+                
+                for item in items:
+                    c_type = item.get("contentType")
+                    name = item.get("name", "Unknown").replace(":", "-").strip()
+                    
+                    if c_type == 1: # Folder
+                        traverse(item["id"], path + f"{name}/")
+                    else: # File/Video
+                        file_url = item.get("url")
+                        if file_url:
+                            links.append(f"{name}: {file_url}")
+                            if c_type == 2:
+                                self.total_videos += 1
+                            elif c_type == 3:
+                                self.total_pdfs += 1
+                        else:
+                            # Some files might not have url directly, maybe 'key' or something else.
+                            # Classplus usually provides it directly in 'url'
+                            pass
+            except Exception as e:
+                print(f"Error traversing folder {folder_id}: {e}")
+
+        traverse(None, "")
+        return links
