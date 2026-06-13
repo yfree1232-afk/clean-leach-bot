@@ -36,7 +36,43 @@ async def handle_text(client: Client, message: Message):
                 return
                 
             clear_state(user_id)
-            await status_msg.edit_text(f"✅ **Token Login Successful!**\n\nRaw courses data length: {len(str(courses_resp.get('data')))}")
+            
+            import base64
+            import json
+            try:
+                payload = cp.token.split(".")[1]
+                padded = payload + "=" * ((4 - len(payload) % 4) % 4)
+                jwt_data = json.loads(base64.b64decode(padded).decode("utf-8"))
+            except:
+                jwt_data = {}
+                
+            org = jwt_data.get("orgCode", "UNKNOWN")
+            name = jwt_data.get("name", "User")
+            
+            courses = courses_resp.get("data", {}).get("data", {}).get("courses", []) if "data" in courses_resp else []
+            if not courses and isinstance(courses_resp.get("data"), dict):
+                 courses = courses_resp.get("data").get("courses", [])
+                 
+            resp_text = f"**ClassPlus Login Successful ✅**\n\n"
+            resp_text += f"**ORG :** `{org}`\n\n"
+            resp_text += f"`{cp.token}`\n\n"
+            resp_text += f"**BATCH ID ➤ BATCH NAME**\n\n"
+            for c in courses:
+                resp_text += f"`{c.get('id')}` - **{c.get('name')}**\n"
+                
+            resp_text += "\n**Reply to this message with the BATCH ID you want to extract.**"
+            
+            if not hasattr(client, "user_sessions"):
+                client.user_sessions = {}
+                
+            client.user_sessions[message.from_user.id] = {
+                "appx": cp,
+                "courses": courses,
+                "app_name": "CLASSPLUS",
+                "base_url": cp.base_url
+            }
+            
+            await status_msg.edit_text(resp_text)
             return
             
         parts = text.split("*")
@@ -85,8 +121,42 @@ async def handle_text(client: Client, message: Message):
             await status_msg.edit_text("❌ **Logged in, but failed to fetch courses.**")
             return
             
-        # Just dump the raw response for now to debug the structure
-        await status_msg.edit_text(f"✅ **Login Successful!**\n\nHere is the raw courses data length: {len(str(courses_resp.get('data')))}")
+        import base64
+        import json
+        try:
+            payload = cp.token.split(".")[1]
+            padded = payload + "=" * ((4 - len(payload) % 4) % 4)
+            jwt_data = json.loads(base64.b64decode(padded).decode("utf-8"))
+        except:
+            jwt_data = {}
+            
+        org = jwt_data.get("orgCode", org_code)
+        name = jwt_data.get("name", "User")
+        
+        courses = courses_resp.get("data", {}).get("data", {}).get("courses", []) if "data" in courses_resp else []
+        if not courses and isinstance(courses_resp.get("data"), dict):
+             courses = courses_resp.get("data").get("courses", [])
+             
+        resp_text = f"**ClassPlus Login Successful ✅**\n\n"
+        resp_text += f"**ORG :** `{org}`\n\n"
+        resp_text += f"`{cp.token}`\n\n"
+        resp_text += f"**BATCH ID ➤ BATCH NAME**\n\n"
+        for c in courses:
+            resp_text += f"`{c.get('id')}` - **{c.get('name')}**\n"
+            
+        resp_text += "\n**Reply to this message with the BATCH ID you want to extract.**"
+        
+        if not hasattr(client, "user_sessions"):
+            client.user_sessions = {}
+            
+        client.user_sessions[message.from_user.id] = {
+            "appx": cp,
+            "courses": courses,
+            "app_name": "CLASSPLUS",
+            "base_url": cp.base_url
+        }
+        
+        await status_msg.edit_text(resp_text)
         return
 
 @Client.on_message(filters.command("extract") & filters.private)
@@ -203,7 +273,7 @@ async def handle_course_selection(client: Client, message: Message):
         await status_msg.edit_text("❌ **No links found in this course.**")
         return
         
-    c_title = selected_course.get("title", selected_course.get("CourseName", "Unknown"))
+    c_title = selected_course.get("title", selected_course.get("CourseName", selected_course.get("name", "Unknown")))
     file_name = f"{c_title.replace('/', '_')}.txt"
     
     with open(file_name, "w", encoding="utf-8") as f:
