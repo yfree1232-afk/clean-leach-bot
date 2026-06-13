@@ -30,7 +30,7 @@ async def handle_callbacks(client: Client, query: CallbackQuery):
     elif data == "menu_platforms":
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("📱 AppX", callback_data="platform_appx")],
-            [InlineKeyboardButton("📚 Classplus (Soon)", callback_data="platform_soon")],
+            [InlineKeyboardButton("📚 Classplus", callback_data="platform_classplus")],
             [InlineKeyboardButton("⬅️ Back", callback_data="menu_main")]
         ])
         await query.message.edit_caption(
@@ -65,6 +65,23 @@ async def handle_callbacks(client: Client, query: CallbackQuery):
         
     elif data == "menu_help":
         await query.answer("Help coming soon!", show_alert=True)
+        
+    elif data == "platform_classplus":
+        set_state(user_id, "WAITING_FOR_CLASSPLUS_PHONE")
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("❌ Cancel", callback_data="menu_platforms")]
+        ])
+        await query.message.edit_caption(
+            caption=(
+                "**📚 Classplus Extraction Engine**\n\n"
+                "Please send your `orgCode` and your `Mobile Number` in the chat to generate an OTP.\n\n"
+                "**Format:**\n"
+                "`[ORG_CODE]*[MOBILE_NUMBER]`\n\n"
+                "> _Example:_\n"
+                "> `aiex*9999999999`"
+            ),
+            reply_markup=keyboard
+        )
         
     elif data == "platform_soon":
         await query.answer("This platform will be added in a future update!", show_alert=True)
